@@ -10,63 +10,6 @@ use crate::{
     message_repository::MessageRepository, wallet::Wallet,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct DecryptedMessage {
-    pub block_timestamp_ms: u64,
-    pub message: Vec<u8>,
-}
-
-// TODO: Message commands (invite to group, etc.)
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StructuredMessage<const KEY_SIZE: usize> {
-    pub next_key: [u8; KEY_SIZE],
-    pub contents: String,
-}
-
-impl<const KEY_SIZE: usize> StructuredMessage<KEY_SIZE> {
-    pub const HEADER_MAGIC: [u8; 4] = [88, 88, 88, 88];
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(4 + self.contents.len());
-
-        buf.extend(Self::HEADER_MAGIC);
-        buf.extend(&self.next_key);
-        buf.extend(self.contents.as_bytes());
-
-        buf
-    }
-
-    pub fn try_from_bytes(bytes: &[u8]) -> Option<Self> {
-        let header = &bytes[0..4];
-
-        if header != Self::HEADER_MAGIC {
-            return None;
-        }
-
-        Some(Self {
-            next_key: bytes[4..4 + KEY_SIZE].try_into().ok()?,
-            contents: String::from_utf8(bytes[4 + KEY_SIZE..].to_vec()).ok()?,
-        })
-    }
-}
-
-#[cfg(test)]
-#[test]
-fn structured_message_serialization() {
-    let sm = StructuredMessage {
-        next_key: [0u8; 32],
-        contents: "hello".to_string(),
-    };
-
-    let bytes = sm.to_bytes();
-
-    assert_eq!(bytes[0..4], StructuredMessage::<32>::HEADER_MAGIC);
-
-    let deserialized = StructuredMessage::try_from_bytes(&bytes).unwrap();
-
-    assert_eq!(sm, deserialized);
-}
-
 pub struct Messenger {
     secret_key: StaticSecret,
     key_registry: KeyRegistry,
@@ -139,15 +82,9 @@ impl Messenger {
             self.public_key().to_bytes().into(),
             vec![correspondent_public_key.into()],
             shared_secret,
-            &[], // no context for direct message (?)
+            &[2], // no context for direct message (?)
         );
 
         Ok(group)
     }
-}
-
-pub trait MessageStream {
-    fn receive_next(
-        &self,
-    ) -> impl std::future::Future<Output = anyhow::Result<Option<DecryptedMessage>>> + Send;
 }

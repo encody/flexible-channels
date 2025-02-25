@@ -19,9 +19,12 @@ use x25519_dalek::StaticSecret;
 
 use fc_client::{
     channel::CorrespondentId,
-    combined::CombinedMessageStream,
-    group::Group,
-    messenger::{DecryptedMessage, Messenger},
+    message::{
+        chunk::ChunkedWriteStream,
+        cleartext::CleartextMessage,
+        stream::{ReadStream, WriteStream},
+    },
+    messenger::Messenger,
     wallet::Wallet,
 };
 
@@ -49,10 +52,10 @@ fn network_rpc_url(network: Option<String>) -> String {
 }
 
 fn monitor_conversation(
-    group: Arc<Group>,
+    stream: impl ReadStream<Output = (CorrespondentId, CleartextMessage)> + Send + Sync + 'static,
 ) -> (
     impl Fn(),
-    tokio::sync::mpsc::Receiver<(CorrespondentId, DecryptedMessage)>,
+    tokio::sync::mpsc::Receiver<(CorrespondentId, CleartextMessage)>,
 ) {
     let alive = Arc::new(AtomicBool::new(true));
     let (send, recv) = tokio::sync::mpsc::channel(1);
@@ -66,10 +69,8 @@ fn monitor_conversation(
 
     tokio::spawn({
         async move {
-            let mut messages = CombinedMessageStream::new(group.streams());
-
             while alive.load(Ordering::SeqCst) {
-                if let Some((sender, message)) = messages.next().await.unwrap() {
+                if let Some((sender, message)) = stream.receive_next().await.unwrap() {
                     send.send((sender.clone(), message)).await.unwrap();
                 } else {
                     sleep(Duration::from_millis(500)).await;
@@ -166,7 +167,9 @@ async fn main() -> anyhow::Result<()> {
 
         let group = Arc::new(messenger.direct_message(&correspondent).await.unwrap());
 
-        let (kill, mut recv) = monitor_conversation(Arc::clone(&group));
+        let group_sender = ChunkedWriteStream::new(Arc::clone(&group), 32);
+
+        let (kill, mut recv) = monitor_conversation(group.read_stream());
 
         line_editor.set_prompt(format!("{}> ", highlight::account::me(&wallet.account_id)));
 
@@ -186,7 +189,7 @@ async fn main() -> anyhow::Result<()> {
 
                     match command {
                         "/say" => {
-                            group.send(tail).await.unwrap();
+                            group_sender.send(tail).await.unwrap();
                         }
                         "/leave" => {
                             writeln!(&stdout, "\r{}.", highlight::text::control("Exiting chat")).unwrap();
@@ -207,7 +210,7 @@ async fn main() -> anyhow::Result<()> {
                             highlight::account::other(&sender_id)
                         };
                         let time_styled = highlight::text::dim(format_time(recv_message.block_timestamp_ms as i64));
-                        let message_string = String::from_utf8_lossy(&recv_message.message);
+                        let message_string = String::from_utf8_lossy(&recv_message.bytes);
                         writeln!(&stdout, "\r[{time_styled}] {sender_styled}: {message_string}").unwrap();
                     } else {
                         writeln!(&stdout, "{}", highlight::text::error("Error connecting to message repository.")).unwrap();

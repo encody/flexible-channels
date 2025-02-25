@@ -158,7 +158,7 @@ async fn happy_path() {
         alice_messenger.public_key().as_bytes(),
     );
     assert_eq!(
-        String::from_utf8(bob_received_dm_1_message.message).unwrap(),
+        String::from_utf8(bob_received_dm_1_message.bytes).unwrap(),
         "dm 1",
     );
 
@@ -172,7 +172,7 @@ async fn happy_path() {
         alice_messenger.public_key().as_bytes(),
     );
     assert_eq!(
-        String::from_utf8(alice_received_dm_1_message.message).unwrap(),
+        String::from_utf8(alice_received_dm_1_message.bytes).unwrap(),
         "dm 1",
     );
 }
