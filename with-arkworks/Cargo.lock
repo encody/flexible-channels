@@ -42,6 +42,7 @@ dependencies = [
  "ark-crypto-primitives-macros",
  "ark-ec",
  "ark-ff",
+ "ark-r1cs-std",
  "ark-relations",
  "ark-serialize",
  "ark-snark",
@@ -53,6 +54,7 @@ dependencies = [
  "merlin",
  "rayon",
  "sha2",
+ "tracing",
 ]
 
 [[package]]
@@ -413,6 +415,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
 name = "itertools"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -685,6 +693,7 @@ dependencies = [
  "ark-serialize",
  "ark-snark",
  "ark-std",
+ "hex",
 ]
 
 [[package]]
